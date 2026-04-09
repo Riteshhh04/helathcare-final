@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { userDb, tokenDb } from '@/lib/db'
-import { generateVerificationToken, generateId } from '@/lib/session'
+import { generateVerificationToken } from '@/lib/session'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -28,9 +28,9 @@ export async function POST(request: NextRequest) {
     const saltRounds = 12
     const passwordHash = await bcrypt.hash(password, saltRounds)
 
-    // Generate verification token
+    // Generate verification token and UUID
     const verificationToken = generateVerificationToken()
-    const userId = generateId('patient')
+    const userId = crypto.randomUUID()
 
     // Create new user in database
     const newUser = await userDb.create({
