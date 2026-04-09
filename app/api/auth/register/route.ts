@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userDb, tokenDb, generateCokNumber } from '@/lib/db'
+import { userDb, tokenDb } from '@/lib/db'
 import { generateVerificationToken, generateId } from '@/lib/session'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password, name, phone, address, dateOfBirth } = body
+    const { email, password, name } = body
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -28,9 +28,8 @@ export async function POST(request: NextRequest) {
     const saltRounds = 12
     const passwordHash = await bcrypt.hash(password, saltRounds)
 
-    // Generate verification token and COK number
+    // Generate verification token
     const verificationToken = generateVerificationToken()
-    const cokNumber = generateCokNumber()
     const userId = generateId('patient')
 
     // Create new user in database
@@ -38,13 +37,10 @@ export async function POST(request: NextRequest) {
       id: userId,
       email: email.toLowerCase(),
       name,
-      password_hash: passwordHash,
+      password: passwordHash,
       role: 'patient',
       is_verified: false,
-      cok_number: cokNumber,
-      phone: phone || null,
-      address: address || null,
-      date_of_birth: dateOfBirth || null,
+      verification_token: verificationToken,
     })
 
     // Create verification token in database
@@ -60,7 +56,6 @@ export async function POST(request: NextRequest) {
         id: newUser.id,
         email: newUser.email,
         name: newUser.name,
-        cokNumber: newUser.cok_number,
       },
       verificationToken, // Only for demo - remove in production
     })

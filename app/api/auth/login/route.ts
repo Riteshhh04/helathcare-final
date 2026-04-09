@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password with bcrypt
-    const isValidPassword = await bcrypt.compare(password, user.password_hash)
+    const isValidPassword = await bcrypt.compare(password, user.password)
     if (!isValidPassword) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role,
-        cokNumber: user.cok_number,
       },
     })
 

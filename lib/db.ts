@@ -5,15 +5,11 @@ export interface DbUser {
   id: string
   email: string
   name: string
-  password_hash: string
+  password: string
   role: 'patient' | 'admin'
   is_verified: boolean
-  cok_number: string | null
-  phone: string | null
-  address: string | null
-  date_of_birth: string | null
+  verification_token: string | null
   created_at: string
-  updated_at: string
 }
 
 export interface DbCertificate {
@@ -29,9 +25,9 @@ export interface DbCertificate {
   file_url: string | null
   blockchain_hash: string | null
   transaction_id: string | null
+  cok_number: string | null
   status: 'pending' | 'verified' | 'revoked'
   created_at: string
-  updated_at: string
 }
 
 export interface DbVerificationToken {
@@ -95,7 +91,7 @@ export const userDb = {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('users')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', id)
       .select()
       .single()
@@ -181,7 +177,7 @@ export const certificateDb = {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('certificates')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', id)
       .select()
       .single()
