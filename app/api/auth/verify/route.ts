@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userStore, tokenStore } from '@/lib/store'
+import { userDb, tokenDb } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,17 +13,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find user by token
-    const userId = tokenStore.get(token)
-    if (!userId) {
+    // Find token in database
+    const tokenRecord = await tokenDb.get(token)
+    if (!tokenRecord) {
       return NextResponse.json(
         { error: 'Invalid or expired verification token' },
         { status: 400 }
       )
     }
 
-    // Update user
-    const user = userStore.update(userId, { isVerified: true, verificationToken: undefined })
+    // Update user to verified
+    const user = await userDb.update(tokenRecord.user_id, { is_verified: true })
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -32,12 +32,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete used token
-    tokenStore.delete(token)
+    await tokenDb.delete(token)
 
     return NextResponse.json({
       message: 'Email verified successfully. You can now log in.',
     })
-  } catch {
+  } catch (error) {
+    console.error('Verification error:', error)
     return NextResponse.json(
       { error: 'Verification failed' },
       { status: 500 }

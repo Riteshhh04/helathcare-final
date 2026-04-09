@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userStore } from '@/lib/store'
+import { userDb } from '@/lib/db'
 import { encodeSession } from '@/lib/session'
 import { SessionData } from '@/lib/types'
+import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,8 +16,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find user
-    const user = userStore.getByEmail(email)
+    // Find user in database
+    const user = await userDb.getByEmail(email)
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -24,8 +25,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify password (in production, use bcrypt.compare)
-    if (user.password !== password) {
+    // Verify password with bcrypt
+    const isValidPassword = await bcrypt.compare(password, user.password_hash)
+    if (!isValidPassword) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -33,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email is verified (skip for admin)
-    if (!user.isVerified && user.role !== 'admin') {
+    if (!user.is_verified && user.role !== 'admin') {
       return NextResponse.json(
         { error: 'Please verify your email before logging in' },
         { status: 403 }
@@ -57,6 +59,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role,
+        cokNumber: user.cok_number,
       },
     })
 
@@ -70,7 +73,8 @@ export async function POST(request: NextRequest) {
     })
 
     return response
-  } catch {
+  } catch (error) {
+    console.error('Login error:', error)
     return NextResponse.json(
       { error: 'Login failed' },
       { status: 500 }
