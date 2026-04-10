@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { certificateStore } from '@/lib/store'
+import { certificateDb } from '@/lib/db'
 import { blockchainService } from '@/lib/blockchain'
 
 export async function POST(request: NextRequest) {
@@ -18,12 +18,12 @@ export async function POST(request: NextRequest) {
     let searchHash = hash
 
     if (certificateId) {
-      certificate = certificateStore.getById(certificateId)
+      certificate = await certificateDb.getById(certificateId)
       if (certificate) {
         searchHash = certificate.blockchainHash
       }
     } else if (hash) {
-      certificate = certificateStore.getByHash(hash)
+      certificate = await certificateDb.getByHash(hash)
     }
 
     if (!searchHash) {
@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
       isValid: false,
       message: blockchainResult.message || 'Certificate verification failed',
     })
-  } catch {
+  } catch (error) {
+    console.error('Verification error:', error)
     return NextResponse.json(
       { error: 'Verification failed' },
       { status: 500 }

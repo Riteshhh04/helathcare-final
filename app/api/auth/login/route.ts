@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userStore } from '@/lib/store'
+import { userDb } from '@/lib/db'
 import { encodeSession } from '@/lib/session'
 import { SessionData } from '@/lib/types'
 
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user
-    const user = userStore.getByEmail(email)
+    const user = await userDb.getByEmail(email)
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
     })
 
     return response
-  } catch {
+  } catch (error) {
+    console.error('Login error:', error)
     return NextResponse.json(
       { error: 'Login failed' },
       { status: 500 }

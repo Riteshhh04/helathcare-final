@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userStore, tokenStore } from '@/lib/store'
+import { userDb, tokenDb } from '@/lib/db'
 import { generateVerificationToken, generateId } from '@/lib/session'
-import { User } from '@/lib/types'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = userStore.getByEmail(email)
+    const existingUser = await userDb.getByEmail(email)
     if (existingUser) {
       return NextResponse.json(
         { error: 'User with this email already exists' },
@@ -28,7 +27,7 @@ export async function POST(request: NextRequest) {
     const verificationToken = generateVerificationToken()
 
     // Create new user
-    const newUser: User = {
+    const newUser = await userDb.create({
       id: generateId('patient'),
       email: email.toLowerCase(),
       name,
@@ -36,11 +35,16 @@ export async function POST(request: NextRequest) {
       role: 'patient',
       isVerified: false,
       verificationToken,
-      createdAt: new Date(),
+    })
+
+    if (!newUser) {
+      return NextResponse.json(
+        { error: 'Failed to create user' },
+        { status: 500 }
+      )
     }
 
-    userStore.create(newUser)
-    tokenStore.create(verificationToken, newUser.id)
+    await tokenDb.create(verificationToken, newUser.id)
 
     // In production, send verification email via Nodemailer
     // For demo, we'll auto-verify after a delay
@@ -50,7 +54,8 @@ export async function POST(request: NextRequest) {
       message: 'Registration successful. Please check your email to verify your account.',
       verificationToken, // Only for demo - remove in production
     })
-  } catch {
+  } catch (error) {
+    console.error('Registration error:', error)
     return NextResponse.json(
       { error: 'Registration failed' },
       { status: 500 }

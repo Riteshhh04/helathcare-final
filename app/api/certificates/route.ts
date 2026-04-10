@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { certificateStore, userStore } from '@/lib/store'
+import { certificateDb, userDb } from '@/lib/db'
 import { blockchainService } from '@/lib/blockchain'
 import { decodeSession, generateId } from '@/lib/session'
 import { Certificate } from '@/lib/types'
@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
   let certificates: Certificate[]
 
   if (session.role === 'admin') {
-    certificates = certificateStore.getAll()
+    certificates = await certificateDb.getAll()
   } else {
-    certificates = certificateStore.getByPatientId(session.userId)
+    certificates = await certificateDb.getByPatientId(session.userId)
   }
 
   return NextResponse.json({ certificates })
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get patient details
-    const patient = userStore.getById(patientId)
+    const patient = await userDb.getById(patientId)
     if (!patient) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       issueDate: new Date(issueDate),
     })
 
-    const certificate: Certificate = {
+    const certificate = await certificateDb.create({
       id: certId,
       patientId,
       patientName: patient.name,
@@ -81,17 +81,22 @@ export async function POST(request: NextRequest) {
       blockchainHash: blockchainResult.hash,
       transactionId: blockchainResult.transactionId,
       status: 'verified',
-      createdAt: new Date(),
-    }
+    })
 
-    certificateStore.create(certificate)
+    if (!certificate) {
+      return NextResponse.json(
+        { error: 'Failed to create certificate' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
       message: 'Certificate created and stored on blockchain',
       certificate,
       blockchain: blockchainResult,
     })
-  } catch {
+  } catch (error) {
+    console.error('Certificate creation error:', error)
     return NextResponse.json(
       { error: 'Failed to create certificate' },
       { status: 500 }

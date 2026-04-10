@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userStore } from '@/lib/store'
+import { userDb } from '@/lib/db'
 import { decodeSession } from '@/lib/session'
 
 export async function GET(request: NextRequest) {
@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  const users = userStore.getAll()
+  const allUsers = await userDb.getAll()
+  const users = allUsers
     .filter(u => u.role === 'patient')
     .map(u => ({
       id: u.id,
