@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "db:setup": "node scripts/setup-db.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -40,6 +41,8 @@
     "@radix-ui/react-tooltip": "1.2.8",
     "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.2.2",
     "chai": "^6.2.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -67,6 +70,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.0",
+    "@types/better-sqlite3": "^7.6.8",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

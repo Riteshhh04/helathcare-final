@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userStore, tokenStore } from '@/lib/store'
+import { userStore, tokenStore } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {

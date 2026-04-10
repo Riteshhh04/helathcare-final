@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userStore } from '@/lib/store'
+import { userStore } from '@/lib/db'
 import { encodeSession } from '@/lib/session'
 import { SessionData } from '@/lib/types'
 

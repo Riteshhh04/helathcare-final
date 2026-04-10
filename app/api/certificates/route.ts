@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { certificateStore, userStore } from '@/lib/store'
+import { certificateStore, userStore } from '@/lib/db'
 import { blockchainService } from '@/lib/blockchain'
 import { decodeSession, generateId } from '@/lib/session'
 import { Certificate } from '@/lib/types'

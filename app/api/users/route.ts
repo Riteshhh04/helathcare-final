@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userStore } from '@/lib/store'
+import { userStore } from '@/lib/db'
 import { decodeSession } from '@/lib/session'
 
 export async function GET(request: NextRequest) {

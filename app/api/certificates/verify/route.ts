@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { certificateStore } from '@/lib/store'
+import { certificateStore } from '@/lib/db'
 import { blockchainService } from '@/lib/blockchain'
 
 export async function POST(request: NextRequest) {
