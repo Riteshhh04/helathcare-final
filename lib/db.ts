@@ -119,12 +119,11 @@ export const userDb = {
     return toUser(data as DbUser)
   },
 
-  async create(user: Omit<User, 'createdAt'>): Promise<User | null> {
+  async create(user: Omit<User, 'id' | 'createdAt'>): Promise<User | null> {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('users')
       .insert({
-        id: user.id,
         email: user.email.toLowerCase(),
         name: user.name,
         password: user.password,
@@ -244,12 +243,11 @@ export const certificateDb = {
     return toCertificate(data as DbCertificate)
   },
 
-  async create(certificate: Omit<Certificate, 'createdAt'>): Promise<Certificate | null> {
+  async create(certificate: Omit<Certificate, 'id' | 'createdAt'>): Promise<Certificate | null> {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('certificates')
       .insert({
-        id: certificate.id,
         patient_id: certificate.patientId,
         patient_name: certificate.patientName,
         patient_email: certificate.patientEmail,
