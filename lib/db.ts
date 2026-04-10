@@ -1,488 +1,250 @@
-import initSqlJs from 'sql.js'
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 import { User, Certificate } from './types'
 
-const DB_PATH = path.join(process.cwd(), 'data', 'healthcare.db')
-
-let db: any = null
-let SQL: any = null
-let initialized = false
+const DATA_DIR = path.join(os.homedir(), '.v0-healthcare-data')
+const DB_FILE = path.join(DATA_DIR, 'healthcare.json')
 
 // Ensure data directory exists
 function ensureDataDir() {
-  const dataDir = path.dirname(DB_PATH)
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true })
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true })
   }
 }
 
-// Initialize database
-export async function initDb() {
-  if (initialized && db) return db
-
-  try {
-    SQL = await initSqlJs()
-    ensureDataDir()
-
-    if (fs.existsSync(DB_PATH)) {
-      const buffer = fs.readFileSync(DB_PATH)
-      db = new SQL.Database(buffer)
-    } else {
-      db = new SQL.Database()
-      createTables()
+// Initialize database file if it doesn't exist
+function initializeDbFile() {
+  ensureDataDir()
+  if (!fs.existsSync(DB_FILE)) {
+    const initialData = {
+      users: [],
+      certificates: [],
+      verificationTokens: [],
     }
-
-    initialized = true
-    return db
-  } catch (error) {
-    console.error('Failed to initialize database:', error)
-    throw error
+    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2))
   }
 }
 
-// Create tables
-function createTables() {
-  if (!db) return
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      password TEXT NOT NULL,
-      role TEXT DEFAULT 'patient',
-      is_verified INTEGER DEFAULT 0,
-      verification_token TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT
-    )
-  `)
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS certificates (
-      id TEXT PRIMARY KEY,
-      patient_id TEXT NOT NULL,
-      patient_name TEXT NOT NULL,
-      patient_email TEXT NOT NULL,
-      certificate_type TEXT NOT NULL,
-      issued_by TEXT NOT NULL,
-      issue_date TEXT NOT NULL,
-      expiry_date TEXT,
-      description TEXT,
-      file_url TEXT,
-      blockchain_hash TEXT NOT NULL,
-      transaction_id TEXT NOT NULL,
-      status TEXT DEFAULT 'active',
-      created_at TEXT NOT NULL,
-      updated_at TEXT,
-      FOREIGN KEY (patient_id) REFERENCES users(id)
-    )
-  `)
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS verification_tokens (
-      token TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-  `)
-
-  saveDb()
+// Read database
+function readDb() {
+  initializeDbFile()
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf-8')
+    return JSON.parse(data)
+  } catch (error) {
+    console.error('Error reading database:', error)
+    return { users: [], certificates: [], verificationTokens: [] }
+  }
 }
 
-// Save database to file
-function saveDb() {
-  if (!db) return
+// Write database
+function writeDb(data: any) {
   try {
     ensureDataDir()
-    const data = db.export()
-    const buffer = Buffer.from(data)
-    fs.writeFileSync(DB_PATH, buffer)
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2))
   } catch (error) {
-    console.error('Failed to save database:', error)
+    console.error('Error writing database:', error)
   }
 }
 
 // User operations
 export const userStore = {
   getAll: async (): Promise<User[]> => {
-    await initDb()
-    try {
-      const result = db.exec('SELECT * FROM users')
-      if (result.length === 0) return []
-      return result[0].values.map((row: any) => ({
-        id: row[0],
-        email: row[1],
-        name: row[2],
-        password: row[3],
-        role: row[4],
-        isVerified: Boolean(row[5]),
-        verificationToken: row[6],
-        createdAt: new Date(row[7]),
-      }))
-    } catch (error) {
-      console.error('Error getting all users:', error)
-      return []
-    }
+    const db = readDb()
+    return db.users.map((user: any) => ({
+      ...user,
+      createdAt: new Date(user.createdAt),
+    }))
   },
 
   getById: async (id: string): Promise<User | undefined> => {
-    await initDb()
-    try {
-      const result = db.exec('SELECT * FROM users WHERE id = ?', [id])
-      if (result.length === 0) return undefined
-      const row = result[0].values[0]
-      return {
-        id: row[0],
-        email: row[1],
-        name: row[2],
-        password: row[3],
-        role: row[4],
-        isVerified: Boolean(row[5]),
-        verificationToken: row[6],
-        createdAt: new Date(row[7]),
-      }
-    } catch (error) {
-      console.error('Error getting user by id:', error)
-      return undefined
+    const db = readDb()
+    const user = db.users.find((u: any) => u.id === id)
+    if (!user) return undefined
+    return {
+      ...user,
+      createdAt: new Date(user.createdAt),
     }
   },
 
   getByEmail: async (email: string): Promise<User | undefined> => {
-    await initDb()
-    try {
-      const result = db.exec('SELECT * FROM users WHERE LOWER(email) = LOWER(?)', [email])
-      if (result.length === 0) return undefined
-      const row = result[0].values[0]
-      return {
-        id: row[0],
-        email: row[1],
-        name: row[2],
-        password: row[3],
-        role: row[4],
-        isVerified: Boolean(row[5]),
-        verificationToken: row[6],
-        createdAt: new Date(row[7]),
-      }
-    } catch (error) {
-      console.error('Error getting user by email:', error)
-      return undefined
+    const db = readDb()
+    const user = db.users.find((u: any) => u.email.toLowerCase() === email.toLowerCase())
+    if (!user) return undefined
+    return {
+      ...user,
+      createdAt: new Date(user.createdAt),
     }
   },
 
   create: async (user: User): Promise<User> => {
-    await initDb()
-    try {
-      db.run(
-        'INSERT INTO users (id, email, name, password, role, is_verified, verification_token, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [user.id, user.email, user.name, user.password, user.role, user.isVerified ? 1 : 0, user.verificationToken || null, user.createdAt.toISOString()]
-      )
-      saveDb()
-      return user
-    } catch (error) {
-      console.error('Error creating user:', error)
-      throw error
-    }
+    const db = readDb()
+    db.users.push({
+      ...user,
+      createdAt: user.createdAt.toISOString(),
+    })
+    writeDb(db)
+    return user
   },
 
   update: async (id: string, updates: Partial<User>): Promise<User | undefined> => {
-    await initDb()
-    try {
-      const user = await userStore.getById(id)
-      if (!user) return undefined
+    const db = readDb()
+    const userIndex = db.users.findIndex((u: any) => u.id === id)
+    if (userIndex === -1) return undefined
 
-      const fields: string[] = []
-      const values: any[] = []
+    const updatedUser = {
+      ...db.users[userIndex],
+      ...updates,
+      createdAt: db.users[userIndex].createdAt,
+      id: db.users[userIndex].id,
+    }
 
-      Object.entries(updates).forEach(([key, value]) => {
-        if (key === 'isVerified') {
-          fields.push('is_verified = ?')
-          values.push(value ? 1 : 0)
-        } else if (key === 'verificationToken') {
-          fields.push('verification_token = ?')
-          values.push(value)
-        } else if (key === 'createdAt') {
-          fields.push('created_at = ?')
-          values.push(value instanceof Date ? value.toISOString() : value)
-        } else if (key !== 'id') {
-          fields.push(`${key} = ?`)
-          values.push(value)
-        }
-      })
+    db.users[userIndex] = updatedUser
+    writeDb(db)
 
-      fields.push('updated_at = ?')
-      values.push(new Date().toISOString())
-      values.push(id)
-
-      db.run(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values)
-      saveDb()
-
-      return await userStore.getById(id)
-    } catch (error) {
-      console.error('Error updating user:', error)
-      return undefined
+    return {
+      ...updatedUser,
+      createdAt: new Date(updatedUser.createdAt),
     }
   },
 
   delete: async (id: string): Promise<boolean> => {
-    await initDb()
-    try {
-      db.run('DELETE FROM users WHERE id = ?', [id])
-      saveDb()
+    const db = readDb()
+    const initialLength = db.users.length
+    db.users = db.users.filter((u: any) => u.id !== id)
+    if (db.users.length < initialLength) {
+      writeDb(db)
       return true
-    } catch (error) {
-      console.error('Error deleting user:', error)
-      return false
     }
+    return false
   },
 }
 
 // Certificate operations
 export const certificateStore = {
   getAll: async (): Promise<Certificate[]> => {
-    await initDb()
-    try {
-      const result = db.exec('SELECT * FROM certificates')
-      if (result.length === 0) return []
-      return result[0].values.map((row: any) => ({
-        id: row[0],
-        patientId: row[1],
-        patientName: row[2],
-        patientEmail: row[3],
-        certificateType: row[4],
-        issuedBy: row[5],
-        issueDate: new Date(row[6]),
-        expiryDate: row[7] ? new Date(row[7]) : undefined,
-        description: row[8],
-        fileUrl: row[9],
-        blockchainHash: row[10],
-        transactionId: row[11],
-        status: row[12],
-        createdAt: new Date(row[13]),
-      }))
-    } catch (error) {
-      console.error('Error getting all certificates:', error)
-      return []
-    }
+    const db = readDb()
+    return db.certificates.map((cert: any) => ({
+      ...cert,
+      issueDate: new Date(cert.issueDate),
+      expiryDate: cert.expiryDate ? new Date(cert.expiryDate) : undefined,
+      createdAt: new Date(cert.createdAt),
+    }))
   },
 
   getById: async (id: string): Promise<Certificate | undefined> => {
-    await initDb()
-    try {
-      const result = db.exec('SELECT * FROM certificates WHERE id = ?', [id])
-      if (result.length === 0) return undefined
-      const row = result[0].values[0]
-      return {
-        id: row[0],
-        patientId: row[1],
-        patientName: row[2],
-        patientEmail: row[3],
-        certificateType: row[4],
-        issuedBy: row[5],
-        issueDate: new Date(row[6]),
-        expiryDate: row[7] ? new Date(row[7]) : undefined,
-        description: row[8],
-        fileUrl: row[9],
-        blockchainHash: row[10],
-        transactionId: row[11],
-        status: row[12],
-        createdAt: new Date(row[13]),
-      }
-    } catch (error) {
-      console.error('Error getting certificate by id:', error)
-      return undefined
+    const db = readDb()
+    const cert = db.certificates.find((c: any) => c.id === id)
+    if (!cert) return undefined
+    return {
+      ...cert,
+      issueDate: new Date(cert.issueDate),
+      expiryDate: cert.expiryDate ? new Date(cert.expiryDate) : undefined,
+      createdAt: new Date(cert.createdAt),
     }
   },
 
   getByPatientId: async (patientId: string): Promise<Certificate[]> => {
-    await initDb()
-    try {
-      const result = db.exec('SELECT * FROM certificates WHERE patient_id = ? ORDER BY created_at DESC', [patientId])
-      if (result.length === 0) return []
-      return result[0].values.map((row: any) => ({
-        id: row[0],
-        patientId: row[1],
-        patientName: row[2],
-        patientEmail: row[3],
-        certificateType: row[4],
-        issuedBy: row[5],
-        issueDate: new Date(row[6]),
-        expiryDate: row[7] ? new Date(row[7]) : undefined,
-        description: row[8],
-        fileUrl: row[9],
-        blockchainHash: row[10],
-        transactionId: row[11],
-        status: row[12],
-        createdAt: new Date(row[13]),
+    const db = readDb()
+    return db.certificates
+      .filter((c: any) => c.patientId === patientId)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((cert: any) => ({
+        ...cert,
+        issueDate: new Date(cert.issueDate),
+        expiryDate: cert.expiryDate ? new Date(cert.expiryDate) : undefined,
+        createdAt: new Date(cert.createdAt),
       }))
-    } catch (error) {
-      console.error('Error getting certificates by patient id:', error)
-      return []
-    }
   },
 
   getByHash: async (hash: string): Promise<Certificate | undefined> => {
-    await initDb()
-    try {
-      const result = db.exec('SELECT * FROM certificates WHERE blockchain_hash = ?', [hash])
-      if (result.length === 0) return undefined
-      const row = result[0].values[0]
-      return {
-        id: row[0],
-        patientId: row[1],
-        patientName: row[2],
-        patientEmail: row[3],
-        certificateType: row[4],
-        issuedBy: row[5],
-        issueDate: new Date(row[6]),
-        expiryDate: row[7] ? new Date(row[7]) : undefined,
-        description: row[8],
-        fileUrl: row[9],
-        blockchainHash: row[10],
-        transactionId: row[11],
-        status: row[12],
-        createdAt: new Date(row[13]),
-      }
-    } catch (error) {
-      console.error('Error getting certificate by hash:', error)
-      return undefined
+    const db = readDb()
+    const cert = db.certificates.find((c: any) => c.blockchainHash === hash)
+    if (!cert) return undefined
+    return {
+      ...cert,
+      issueDate: new Date(cert.issueDate),
+      expiryDate: cert.expiryDate ? new Date(cert.expiryDate) : undefined,
+      createdAt: new Date(cert.createdAt),
     }
   },
 
   create: async (certificate: Certificate): Promise<Certificate> => {
-    await initDb()
-    try {
-      db.run(
-        'INSERT INTO certificates (id, patient_id, patient_name, patient_email, certificate_type, issued_by, issue_date, expiry_date, description, file_url, blockchain_hash, transaction_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          certificate.id,
-          certificate.patientId,
-          certificate.patientName,
-          certificate.patientEmail,
-          certificate.certificateType,
-          certificate.issuedBy,
-          certificate.issueDate.toISOString().split('T')[0],
-          certificate.expiryDate ? certificate.expiryDate.toISOString().split('T')[0] : null,
-          certificate.description,
-          certificate.fileUrl || null,
-          certificate.blockchainHash,
-          certificate.transactionId,
-          certificate.status,
-          certificate.createdAt.toISOString(),
-        ]
-      )
-      saveDb()
-      return certificate
-    } catch (error) {
-      console.error('Error creating certificate:', error)
-      throw error
-    }
+    const db = readDb()
+    db.certificates.push({
+      ...certificate,
+      issueDate: certificate.issueDate.toISOString(),
+      expiryDate: certificate.expiryDate ? certificate.expiryDate.toISOString() : null,
+      createdAt: certificate.createdAt.toISOString(),
+    })
+    writeDb(db)
+    return certificate
   },
 
   update: async (id: string, updates: Partial<Certificate>): Promise<Certificate | undefined> => {
-    await initDb()
-    try {
-      const cert = await certificateStore.getById(id)
-      if (!cert) return undefined
+    const db = readDb()
+    const certIndex = db.certificates.findIndex((c: any) => c.id === id)
+    if (certIndex === -1) return undefined
 
-      const fields: string[] = []
-      const values: any[] = []
+    const updatedCert = {
+      ...db.certificates[certIndex],
+      ...updates,
+      issueDate: db.certificates[certIndex].issueDate,
+      createdAt: db.certificates[certIndex].createdAt,
+      id: db.certificates[certIndex].id,
+    }
 
-      Object.entries(updates).forEach(([key, value]) => {
-        if (key === 'patientId') {
-          fields.push('patient_id = ?')
-          values.push(value)
-        } else if (key === 'patientName') {
-          fields.push('patient_name = ?')
-          values.push(value)
-        } else if (key === 'patientEmail') {
-          fields.push('patient_email = ?')
-          values.push(value)
-        } else if (key === 'certificateType') {
-          fields.push('certificate_type = ?')
-          values.push(value)
-        } else if (key === 'issuedBy') {
-          fields.push('issued_by = ?')
-          values.push(value)
-        } else if (key === 'issueDate' || key === 'expiryDate') {
-          const column = key === 'issueDate' ? 'issue_date' : 'expiry_date'
-          fields.push(`${column} = ?`)
-          values.push(value instanceof Date ? value.toISOString().split('T')[0] : value)
-        } else if (key === 'blockchainHash') {
-          fields.push('blockchain_hash = ?')
-          values.push(value)
-        } else if (key === 'transactionId') {
-          fields.push('transaction_id = ?')
-          values.push(value)
-        } else if (key !== 'id' && key !== 'createdAt') {
-          fields.push(`${key} = ?`)
-          values.push(value)
-        }
-      })
+    db.certificates[certIndex] = updatedCert
+    writeDb(db)
 
-      fields.push('updated_at = ?')
-      values.push(new Date().toISOString())
-      values.push(id)
-
-      db.run(`UPDATE certificates SET ${fields.join(', ')} WHERE id = ?`, values)
-      saveDb()
-
-      return await certificateStore.getById(id)
-    } catch (error) {
-      console.error('Error updating certificate:', error)
-      return undefined
+    return {
+      ...updatedCert,
+      issueDate: new Date(updatedCert.issueDate),
+      expiryDate: updatedCert.expiryDate ? new Date(updatedCert.expiryDate) : undefined,
+      createdAt: new Date(updatedCert.createdAt),
     }
   },
 
   delete: async (id: string): Promise<boolean> => {
-    await initDb()
-    try {
-      db.run('DELETE FROM certificates WHERE id = ?', [id])
-      saveDb()
+    const db = readDb()
+    const initialLength = db.certificates.length
+    db.certificates = db.certificates.filter((c: any) => c.id !== id)
+    if (db.certificates.length < initialLength) {
+      writeDb(db)
       return true
-    } catch (error) {
-      console.error('Error deleting certificate:', error)
-      return false
     }
+    return false
   },
 }
 
 // Token operations
 export const tokenStore = {
   create: async (token: string, userId: string): Promise<void> => {
-    await initDb()
-    try {
-      db.run('INSERT INTO verification_tokens (token, user_id, created_at) VALUES (?, ?, ?)', [token, userId, new Date().toISOString()])
-      saveDb()
-    } catch (error) {
-      console.error('Error creating token:', error)
-    }
+    const db = readDb()
+    db.verificationTokens.push({
+      token,
+      userId,
+      createdAt: new Date().toISOString(),
+    })
+    writeDb(db)
   },
 
   get: async (token: string): Promise<string | undefined> => {
-    await initDb()
-    try {
-      const result = db.exec('SELECT user_id FROM verification_tokens WHERE token = ?', [token])
-      if (result.length === 0) return undefined
-      return result[0].values[0][0]
-    } catch (error) {
-      console.error('Error getting token:', error)
-      return undefined
-    }
+    const db = readDb()
+    const tokenRecord = db.verificationTokens.find((t: any) => t.token === token)
+    return tokenRecord?.userId
   },
 
   delete: async (token: string): Promise<boolean> => {
-    await initDb()
-    try {
-      db.run('DELETE FROM verification_tokens WHERE token = ?', [token])
-      saveDb()
+    const db = readDb()
+    const initialLength = db.verificationTokens.length
+    db.verificationTokens = db.verificationTokens.filter((t: any) => t.token !== token)
+    if (db.verificationTokens.length < initialLength) {
+      writeDb(db)
       return true
-    } catch (error) {
-      console.error('Error deleting token:', error)
-      return false
     }
+    return false
   },
 }
 
