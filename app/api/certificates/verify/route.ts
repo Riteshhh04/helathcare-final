@@ -18,12 +18,12 @@ export async function POST(request: NextRequest) {
     let searchHash = hash
 
     if (certificateId) {
-      certificate = certificateStore.getById(certificateId)
+      certificate = await certificateStore.getById(certificateId)
       if (certificate) {
         searchHash = certificate.blockchainHash
       }
     } else if (hash) {
-      certificate = certificateStore.getByHash(hash)
+      certificate = await certificateStore.getByHash(hash)
     }
 
     if (!searchHash) {

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = userStore.getByEmail(email)
+    const existingUser = await userStore.getByEmail(email)
     if (existingUser) {
       return NextResponse.json(
         { error: 'User with this email already exists' },
@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
     }
 
-    userStore.create(newUser)
-    tokenStore.create(verificationToken, newUser.id)
+    await userStore.create(newUser)
+    await tokenStore.create(verificationToken, newUser.id)
 
     // In production, send verification email via Nodemailer
     // For demo, we'll auto-verify after a delay

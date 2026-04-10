@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
   let certificates: Certificate[]
 
   if (session.role === 'admin') {
-    certificates = certificateStore.getAll()
+    certificates = await certificateStore.getAll()
   } else {
-    certificates = certificateStore.getByPatientId(session.userId)
+    certificates = await certificateStore.getByPatientId(session.userId)
   }
 
   return NextResponse.json({ certificates })
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get patient details
-    const patient = userStore.getById(patientId)
+    const patient = await userStore.getById(patientId)
     if (!patient) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
     }
 
-    certificateStore.create(certificate)
+    await certificateStore.create(certificate)
 
     return NextResponse.json({
       message: 'Certificate created and stored on blockchain',

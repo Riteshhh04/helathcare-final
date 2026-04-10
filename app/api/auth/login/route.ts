@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user
-    const user = userStore.getByEmail(email)
+    const user = await userStore.getByEmail(email)
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
